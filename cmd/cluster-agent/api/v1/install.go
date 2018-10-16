@@ -7,11 +7,11 @@ package v1
 
 import (
 	"encoding/json"
-	"expvar"
 	"fmt"
 	"net/http"
 
 	"github.com/gorilla/mux"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/DataDog/datadog-agent/pkg/clusteragent"
 	as "github.com/DataDog/datadog-agent/pkg/util/kubernetes/apiserver"
@@ -19,16 +19,23 @@ import (
 )
 
 var (
-	apiStats         = expvar.NewMap("apiv1")
-	metadataStats    = new(expvar.Map).Init()
-	metadataErrors   = &expvar.Int{}
-	metadataRequests = &expvar.Int{}
+	metadataQueries = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "metadata_queries",
+			Help: "Counter of requests made to datadog",
+		},
+	)
+	metadataQueriesErrors = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "metadata_queries_errors",
+			Help: "Counter of errors querying datadog",
+		},
+	)
 )
 
 func init() {
-	apiStats.Set("Metadata", metadataStats)
-	metadataStats.Set("Errors", metadataErrors)
-	metadataStats.Set("Requests", metadataRequests)
+	prometheus.MustRegister(metadataQueries)
+	prometheus.MustRegister(metadataQueriesErrors)
 }
 
 // Install registers v1 API endpoints
@@ -65,7 +72,7 @@ func getNodeMetadata(w http.ResponseWriter, r *http.Request) {
 			Example: "no cached metadata found for the node localhost"
 	*/
 
-	metadataRequests.Add(1)
+	metadataQueries.Inc()
 
 	vars := mux.Vars(r)
 	var labelBytes []byte
@@ -74,14 +81,14 @@ func getNodeMetadata(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Errorf("Could not retrieve the node labels of %s: %v", nodeName, err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		metadataErrors.Add(1)
+		metadataQueriesErrors.Inc()
 		return
 	}
 	labelBytes, err = json.Marshal(nodeLabels)
 	if err != nil {
 		log.Errorf("Could not process the labels of the node %s from the informer's cache: %v", nodeName, err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		metadataErrors.Add(1)
+		metadataQueriesErrors.Inc()
 		return
 	}
 	if len(labelBytes) > 0 {
@@ -114,7 +121,7 @@ func getPodMetadata(w http.ResponseWriter, r *http.Request) {
 			Example: "no cached metadata found for the pod my-nginx-5d69 on the node localhost"
 	*/
 
-	metadataRequests.Add(1)
+	metadataQueries.Inc()
 
 	vars := mux.Vars(r)
 	var metaBytes []byte
@@ -125,7 +132,7 @@ func getPodMetadata(w http.ResponseWriter, r *http.Request) {
 	if errMetaList != nil {
 		log.Errorf("Could not retrieve the metadata of: %s from the cache", podName)
 		http.Error(w, errMetaList.Error(), http.StatusInternalServerError)
-		metadataErrors.Add(1)
+		metadataQueriesErrors.Inc()
 		return
 	}
 
@@ -133,7 +140,7 @@ func getPodMetadata(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Errorf("Could not process the list of services for: %s", podName)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		metadataErrors.Add(1)
+		metadataQueriesErrors.Inc()
 		return
 	}
 	if len(metaBytes) != 0 {
