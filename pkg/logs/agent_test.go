@@ -61,7 +61,7 @@ func (suite *AgentTestSuite) TearDownTest() {
 	os.Remove(suite.testDir)
 
 	// Resets the metrics we check.
-	metrics.LogsDecoded.Set(0)
+	metrics.LogsCollected.Set(0)
 	metrics.LogsProcessed.Set(0)
 	metrics.LogsSent.Set(0)
 	metrics.DestinationErrors.Set(0)
@@ -87,7 +87,7 @@ func (suite *AgentTestSuite) TestAgent() {
 	agent, sources, _ := createAgent(endpoints)
 
 	zero := int64(0)
-	assert.Equal(suite.T(), zero, metrics.LogsDecoded.Value())
+	assert.Equal(suite.T(), zero, metrics.LogsCollected.Value())
 	assert.Equal(suite.T(), zero, metrics.LogsProcessed.Value())
 	assert.Equal(suite.T(), zero, metrics.LogsSent.Value())
 	assert.Equal(suite.T(), zero, metrics.DestinationErrors.Value())
@@ -98,7 +98,7 @@ func (suite *AgentTestSuite) TestAgent() {
 	time.Sleep(10 * time.Millisecond)
 	agent.Stop()
 
-	assert.Equal(suite.T(), suite.fakeLogs, metrics.LogsDecoded.Value())
+	assert.Equal(suite.T(), suite.fakeLogs, metrics.LogsCollected.Value())
 	assert.Equal(suite.T(), suite.fakeLogs, metrics.LogsProcessed.Value())
 	assert.Equal(suite.T(), suite.fakeLogs, metrics.LogsSent.Value())
 	assert.Equal(suite.T(), zero, metrics.DestinationErrors.Value())
@@ -120,7 +120,7 @@ func (suite *AgentTestSuite) TestAgentStopsWithWrongBackend() {
 	time.Sleep(10 * time.Millisecond)
 	agent.Stop()
 
-	assert.Equal(suite.T(), suite.fakeLogs, metrics.LogsDecoded.Value())
+	assert.Equal(suite.T(), suite.fakeLogs, metrics.LogsCollected.Value())
 	assert.Equal(suite.T(), suite.fakeLogs, metrics.LogsProcessed.Value())
 	assert.Equal(suite.T(), int64(0), metrics.LogsSent.Value())
 	assert.True(suite.T(), metrics.DestinationErrors.Value() > 0)
